@@ -92,28 +92,31 @@ mudaVar ((s,i):xs) v n
 
 
 ebigStep :: (E,Memoria) -> Int
-ebigStep (Var x,s) = procuraVar s x
-ebigStep (Num n,s) = n
-ebigStep (Soma e1 e2,s)  = ebigStep (e1,s) + ebigStep (e2,s)
---ebigStep (Sub e1 e2,s)  = (subtração)
---ebigStep (Mult e1 e2,s)  = (multiplicação)
--- ebigStep(Div e1 e2,s)
+ebigStep (Var x,s)              = procuraVar s x
+ebigStep (Num n,s)              = n
+ebigStep (Soma e1 e2,s)         = ebigStep (e1,s) + ebigStep (e2,s)
+ebigStep (Sub e1 e2,s)          = ebigStep (e1,s) - ebigStep (e2,s)
+ebigStep (Mult e1 e2,s)         = ebigStep (e1,s) * ebigStep (e2,s)
+ebigStep(Div e1 e2,s)           = ebigStep (e1,s) `div` ebigStep (e2,s)
 
 
 bbigStep :: (B,Memoria) -> Bool
-bbigStep (TRUE,s)  = True
-bbigStep (FALSE,s) = False
+bbigStep (TRUE,s)               = True
+bbigStep (FALSE,s)              = False
 bbigStep (Not b,s)
    | bbigStep (b,s) == True     = False
    | otherwise                  = True
---bbigStep (And b1 b2,s )  =
---bbigStep (Or b1 b2,s )  =
---bbigStep (Leq e1 e2,s) =
---bbigStep (Igual e1 e2,s) = -- recebe duas expressões aritméticas e devolve um valor booleano dizendo se são iguais
+bbigStep (And b1 b2,s )
+    | bbigStep (b1,s) == False  = False
+    | otherwise                 = bbigStep (b2,s)
+bbigStep (Or b1 b2,s )
+    | bbigStep (b1,s) == True   = True
+    | otherwise                 = bbigStep (b2,s)
+bbigStep (Leq e1 e2,s) = ebigStep (e1,s) <= ebigStep (e2,s)
+bbigStep (Igual e1 e2,s) = ebigStep (e1,s) == ebigStep (e2,s)
 
 cbigStep :: (C,Memoria) -> (C,Memoria)
 cbigStep (Skip,s) = (Skip,s)
--- cbigStep (If b c1 c2,s)
 --cbigStep (Seq c1 c2,s)
 --cbigStep (Atrib (Var x) e,s)
 --     While B C
@@ -184,3 +187,11 @@ fatorial = (Seq (Atrib (Var "y") (Num 1))
                 (While (Not (Igual (Var "x") (Num 1)))
                        (Seq (Atrib (Var "y") (Mult (Var "y") (Var "x")))
                             (Atrib (Var "x") (Sub (Var "x") (Num 1))))))
+
+testeexpressaocompleto :: E
+testeexpressaocompleto = Mult (Num 3) (Soma (Num 3) (Div (Num 5) (Num 2)) )
+
+testebooleanand::B
+testebooleanor::B
+testebooleanand = And (And TRUE FALSE) (TRUE)
+testebooleanor = Or (TRUE) (FALSE)
