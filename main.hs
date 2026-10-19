@@ -107,20 +107,23 @@ bbigStep (Not b,s)
    | bbigStep (b,s) == True     = False
    | otherwise                  = True
 bbigStep (And b1 b2,s )
-    | bbigStep (b1,s) == False  = False
-    | otherwise                 = bbigStep (b2,s)
+    | bbigStep (b1,s) == True   = bbigStep (b2,s)
+    | otherwise                 = False
 bbigStep (Or b1 b2,s )
     | bbigStep (b1,s) == True   = True
     | otherwise                 = bbigStep (b2,s)
 bbigStep (Leq e1 e2,s) = ebigStep (e1,s) <= ebigStep (e2,s)
 bbigStep (Igual e1 e2,s) = ebigStep (e1,s) == ebigStep (e2,s)
 
+
 cbigStep :: (C,Memoria) -> (C,Memoria)
 cbigStep (Skip,s) = (Skip,s)
---cbigStep (Seq c1 c2,s)
---cbigStep (Atrib (Var x) e,s)
---     While B C
- --  SevenTimes C   ---- Executa o comando C 7 vezes
+cbigStep (Seq c1 c2, s) = cbigStep (c2, snd (cbigStep (c1, s)))
+cbigStep (Atrib (Var x) e,s) = (Skip, mudaVar s x (ebigStep (e,s)))
+cbigStep (While b c, s)
+    | bbigStep (b, s) == True       = cbigStep (While b c, snd (cbigStep (c, s)))
+    | otherwise                     = (Skip, s)
+  -- SevenTimes C   ---- Executa o comando C 7 vezes
   -- DoWhile C B      ---- Do C While B: executa C enquanto B avalie para verdadeiro
   -- DuplaATrib E E E E -- recebe 2 variáveis e 2 expressões (DuplaATrib (Var v1) (Var v2) e1 e2) e faz v1:=e1 e v2:=e2
   -- AtribCond B E E E --- AtribCond b (Var v1) e1 e2: se b for verdade, então faz v1:e1, se B for falso faz v1:=e2
@@ -188,10 +191,18 @@ fatorial = (Seq (Atrib (Var "y") (Num 1))
                        (Seq (Atrib (Var "y") (Mult (Var "y") (Var "x")))
                             (Atrib (Var "x") (Sub (Var "x") (Num 1))))))
 
+testeAtribSeq :: C
+testeAtribSeq = Seq (Atrib (Var "x") (Num 4))
+                    (Atrib (Var "y") (Soma (Var "x") (Num 3)))
+
+testeIncWhile :: C
+testeIncWhile = Seq (Atrib (Var "x") (Num 0))
+                    (While (Leq ( Var "x" ) (Num 10)) (Atrib (Var "x") (Soma (Var "x") (Num 1))) )
+
 testeexpressaocompleto :: E
 testeexpressaocompleto = Mult (Num 3) (Soma (Num 3) (Div (Num 5) (Num 2)) )
 
 testebooleanand::B
 testebooleanor::B
 testebooleanand = And (And TRUE FALSE) (TRUE)
-testebooleanor = Or (TRUE) (FALSE)
+testebooleanor = Or (TRUE) (Or FALSE FALSE)
