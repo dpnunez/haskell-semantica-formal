@@ -123,13 +123,28 @@ cbigStep (Atrib (Var x) e,s) = (Skip, mudaVar s x (ebigStep (e,s)))
 cbigStep (While b c, s)
     | bbigStep (b, s) == True       = cbigStep (While b c, snd (cbigStep (c, s)))
     | otherwise                     = (Skip, s)
-  -- SevenTimes C   ---- Executa o comando C 7 vezes
-  -- DoWhile C B      ---- Do C While B: executa C enquanto B avalie para verdadeiro
-  -- DuplaATrib E E E E -- recebe 2 variáveis e 2 expressões (DuplaATrib (Var v1) (Var v2) e1 e2) e faz v1:=e1 e v2:=e2
-  -- AtribCond B E E E --- AtribCond b (Var v1) e1 e2: se b for verdade, então faz v1:e1, se B for falso faz v1:=e2
-  -- Swap E E -- swap(x,y): troca o conteúdo das variáveis x e y
-  -- Unless B C C   ---- Unless B C1 C2: se B avalia para falso, então executa C1, caso contrário, executa C2
-  -- Assert B C     --- caso B avalie para True então executa C. Caso contrário, não faz nada
+cbigStep (SevenTimes c, s) =
+    cbigStep (Seq c (Seq c (Seq c (Seq c (Seq c (Seq c c))))), s)
+cbigStep (DoWhile c b, s) = cbigStep (Seq c (While b c), s)
+cbigStep (DuplaATrib (Var v1) (Var v2) e1 e2, s) =
+    (
+        Skip,
+        mudaVar (mudaVar s v1 (ebigStep(e1,s))) v2 (ebigStep(e2,s))
+    )
+cbigStep (AtribCond b (Var v1) e1 e2, s)
+    | bbigStep (b,s) == True    = (Skip, mudaVar s v1 (ebigStep(e1,s)))
+    | otherwise                 = (Skip, mudaVar s v1 (ebigStep(e2,s)))
+cbigStep (Swap (Var v1) (Var v2), s) =
+    (
+        Skip,
+        mudaVar (mudaVar s v1 (procuraVar s v2)) v2 (procuraVar s v1)
+    )
+cbigStep (Unless b c1 c2, s)
+    | bbigStep (b, s) == False      = cbigStep (c1,s)
+    | otherwise                     = cbigStep (c2,s)
+cbigStep (Assert b c, s)
+    | bbigStep (b, s) == True       = cbigStep (c,s)
+    | otherwise                     = (Skip, s)
 
 --------------------------------------
 ---
@@ -206,3 +221,70 @@ testebooleanand::B
 testebooleanor::B
 testebooleanand = And (And TRUE FALSE) (TRUE)
 testebooleanor = Or (TRUE) (Or FALSE FALSE)
+
+-- Testes individuais dos comandos novos com a memoria exSigma2 = {x=3, y=0, z=0}.
+testeSevenTimes :: C
+testeSevenTimes = SevenTimes (Atrib (Var "z") (Soma (Var "z") (Num 1)))
+
+testeDoWhile :: C
+testeDoWhile = DoWhile (Atrib (Var "x") (Sub (Var "x") (Num 1)))
+                           (Leq (Num 1) (Var "x"))
+
+testeDuplaAtrib :: C
+testeDuplaAtrib = DuplaATrib (Var "x") (Var "y") (Var "y") (Var "x")
+
+testeAtribCond :: C
+testeAtribCond = AtribCond (Leq (Var "x") (Num 3)) (Var "y") (Num 1) (Num 2)
+
+testeAtribCondFalso :: C
+testeAtribCondFalso = AtribCond (Leq (Num 4) (Var "x")) (Var "y") (Num 1) (Num 2)
+
+testeSwap :: C
+testeSwap = Swap (Var "x") (Var "y")
+
+testeUnless :: C
+testeUnless = Unless (Leq (Var "x") (Num 2))
+                      (Atrib (Var "y") (Num 1))
+                      (Atrib (Var "y") (Num 2))
+
+testeUnlessVerdadeiro :: C
+testeUnlessVerdadeiro = Unless (Leq (Var "x") (Num 3))
+                                (Atrib (Var "y") (Num 1))
+                                (Atrib (Var "y") (Num 2))
+
+testeAssert :: C
+testeAssert = Assert (Igual (Var "x") (Num 3)) (Atrib (Var "y") (Num 1))
+
+testeAssertFalso :: C
+testeAssertFalso = Assert FALSE (Atrib (Var "y") (Num 1))
+
+------------------------ Programa Teste com todos os comandos desenvolvidos ------------------------
+
+-- Pseudocodigo de progTesteTodosComandos, com exSigma2 = {x=3, y=0, z=0}:
+-- (x, y) := (1, 2)                     -- DuplaATrib
+-- repetir 7 vezes: z := z + 1         -- SevenTimes
+-- fazer x := x + 1 enquanto x <= 3    -- DoWhile
+-- y := (x <= 4) ? y + z : 0           -- AtribCond
+-- trocar(x, y)                         -- Swap
+-- se nao (x <= y): z := z + x
+-- senao: z := 0                       -- Unless
+-- se z == 16: z := z + 1             -- Assert
+-- caso contrario: nao faz nada
+-- Estado final esperado: {x=9, y=4, z=17}.
+progTesteTodosComandos :: C
+progTesteTodosComandos =
+    Seq (DuplaATrib (Var "x") (Var "y") (Num 1) (Num 2))
+    (Seq (SevenTimes (Atrib (Var "z") (Soma (Var "z") (Num 1))))
+    (Seq (DoWhile (Atrib (Var "x") (Soma (Var "x") (Num 1)))
+                  (Leq (Var "x") (Num 3)))
+    (Seq (AtribCond (Leq (Var "x") (Num 4)) (Var "y")
+                    (Soma (Var "y") (Var "z")) (Num 0))
+    (Seq (Swap (Var "x") (Var "y"))
+    (Seq (Unless (Leq (Var "x") (Var "y"))
+                 (Atrib (Var "z") (Soma (Var "z") (Var "x")))
+                 (Atrib (Var "z") (Num 0)))
+         (Assert (Igual (Var "z") (Num 16))
+                 (Atrib (Var "z") (Soma (Var "z") (Num 1)))))))))
+
+-- *Main> cbigStep (progTesteTodosComandos, exSigma2)
+-- (Skip,[("x",9),("y",4),("z",17)])
