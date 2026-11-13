@@ -118,6 +118,9 @@ bbigStep (Igual e1 e2,s) = ebigStep (e1,s) == ebigStep (e2,s)
 
 cbigStep :: (C,Memoria) -> (C,Memoria)
 cbigStep (Skip,s) = (Skip,s)
+cbigStep (If b c1 c2, s)
+    | bbigStep (b, s) == True       = cbigStep (c1, s)
+    | otherwise                     = cbigStep (c2, s)
 cbigStep (Seq c1 c2, s) = cbigStep (c2, snd (cbigStep (c1, s)))
 cbigStep (Atrib (Var x) e,s) = (Skip, mudaVar s x (ebigStep (e,s)))
 cbigStep (While b c, s)
@@ -209,6 +212,20 @@ fatorial = (Seq (Atrib (Var "y") (Num 1))
 testeAtribSeq :: C
 testeAtribSeq = Seq (Atrib (Var "x") (Num 4))
                     (Atrib (Var "y") (Soma (Var "x") (Num 3)))
+
+testeIfVerdadeiro :: C
+testeIfVerdadeiro = If (Igual (Var "x") (Num 3))
+                       (Atrib (Var "y") (Num 1))
+                       (Atrib (Var "y") (Num 2))
+
+testeIfFalso :: C
+testeIfFalso = If (Igual (Var "x") (Num 4))
+                  (Atrib (Var "y") (Num 1))
+                  (Atrib (Var "y") (Num 2))
+
+verificaIf :: Bool
+verificaIf = cbigStep (testeIfVerdadeiro, exSigma2) == (Skip, [("x",3), ("y",1), ("z",0)])
+          && cbigStep (testeIfFalso, exSigma2) == (Skip, [("x",3), ("y",2), ("z",0)])
 
 testeIncWhile :: C
 testeIncWhile = Seq (Atrib (Var "x") (Num 0))
